@@ -1,0 +1,3 @@
+[submodule "ot_library"]
+	path = ot_library
+	url = https://github.com/wbernoudy/ot.py.git
