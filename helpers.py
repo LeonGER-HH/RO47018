@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from phe import paillier
 
 
 def plot_ellipsoid(P, alpha, label):
@@ -28,3 +29,24 @@ def plot_boundary(c, b, label, bounds, color):
             x = np.linspace(bounds[0], bounds[1], 2)
             y = [-b, -b]
     plt.plot(x, y, "--", color=color, label=label)
+
+
+def admm_analysis(iter_max, agents, mediator, timing_log):
+    x_ticks = np.arange(0, iter_max + 1)
+    plt.figure(1)
+    plt.plot(x_ticks, agents[0].x, label=r"$x_1$")
+    plt.plot(x_ticks, agents[1].x, label=r"$x_2$")
+    plt.plot(x_ticks, agents[2].x, label=r"$x_3$")
+    for i, x_bar_i in enumerate(mediator.x_bar):
+        if isinstance(x_bar_i, paillier.EncryptedNumber):
+            mediator.x_bar[i] = mediator.pri_k.decrypt(x_bar_i)
+    plt.plot(x_ticks, mediator.x_bar, "--", label=r"$\bar{x}$")
+    plt.xlabel("iteration number")
+    plt.legend()
+    plt.show()
+
+    plt.figure(2)
+    plt.plot(np.arange(0, iter_max), timing_log)
+    plt.xlabel("iteration number")
+    plt.ylabel("time [s]")
+    plt.show()
