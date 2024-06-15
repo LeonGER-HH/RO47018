@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from phe import paillier
+from matplotlib.ticker import MaxNLocator
 
 
 def plot_ellipsoid(P, alpha, label):
@@ -31,22 +32,28 @@ def plot_boundary(c, b, label, bounds, color):
     plt.plot(x, y, "--", color=color, label=label)
 
 
-def admm_analysis(iter_max, agents, mediator, timing_log):
+def admm_analysis(iter_max, agents, mediator, timing_log, plot_type):
     x_ticks = np.arange(0, iter_max + 1)
     plt.figure(1)
-    plt.plot(x_ticks, agents[0].x, label=r"$x_1$")
-    plt.plot(x_ticks, agents[1].x, label=r"$x_2$")
-    plt.plot(x_ticks, agents[2].x, label=r"$x_3$")
+    plt.plot(x_ticks, agents[0].x_decrypted, label=r"$x_1$")
+    plt.plot(x_ticks, agents[1].x_decrypted, label=r"$x_2$")
+    plt.plot(x_ticks, agents[2].x_decrypted, label=r"$x_3$")
     for i, x_bar_i in enumerate(mediator.x_bar):
         if isinstance(x_bar_i, paillier.EncryptedNumber):
             mediator.x_bar[i] = mediator.pri_k.decrypt(x_bar_i)
     plt.plot(x_ticks, mediator.x_bar, "--", label=r"$\bar{x}$")
+    ax = plt.gca()
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     plt.xlabel("iteration number")
     plt.legend()
+    plt.savefig('figures4report/a2_' + plot_type + '_states.png')
     plt.show()
 
     plt.figure(2)
-    plt.plot(np.arange(0, iter_max), timing_log)
+    plt.plot(np.arange(1, iter_max+1), timing_log)
     plt.xlabel("iteration number")
     plt.ylabel("time [s]")
+    ax = plt.gca()
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    plt.savefig('figures4report/a2_' + plot_type + '_timing.png')
     plt.show()

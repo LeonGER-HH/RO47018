@@ -11,22 +11,20 @@ from ot_library.ot import *
 
 class RNGenerator:
     def __init__(self):
-        self.secrets = None
         self.alice = None
 
     def generate_randoms(self, n_agents, k_iters):
-        rng = np.random.random((k_iters, n_agents))
+        rng = np.random.randint(0, 256, (k_iters, n_agents))
         rng[:, -1] = -1*np.sum(rng[:, :-1], axis=1)
         # for i in range(n_agents):
         #     np.random.shuffle(rng[:-1, i])
-        self.secrets = rng
-        self.alice = Alice([self.secrets[:, i] for i in range(n_agents)], n_agents - 1, k_iters)
+        secrets = [b''.join(int(num).to_bytes(2, byteorder='little', signed=True) for num in rng[:, i]) for i in range(n_agents)]
+        self.alice = Alice(secrets, 1, len(secrets[0]))
         self.alice.setup()
         return
 
-    def send_rn(self, number):
-        # send a random number vector
-        return self.secrets[:, number]
+    def send_rn(self):
+        self.alice.transmit()
 
 
 class Mediator:
@@ -63,7 +61,11 @@ class Mediator:
         if padding:
             self.rngenerator.generate_randoms(len(agents), iter_max)
             for agent in agents:
-                agent.pick_secret(self.rngenerator)
+                agent.pick_secret()
+                self.rngenerator.send_rn()
+                agent.receive_rn()
+            ot_end_time = time.perf_counter()
+            print(f"Oblivious transfer took {np.round(ot_end_time - start_time, 2)}s")
 
         for k in range(iter_max):
             iter_start_time = time.perf_counter()
@@ -80,9 +82,9 @@ class Mediator:
             iter_end_time = time.perf_counter()
             times.append(iter_end_time - iter_start_time)
         end_time = time.perf_counter()
-        print(f"The whole ADMM took {np.round(end_time - start_time, 2)}s.")
+        print(f"The whole ADMM took {np.round(end_time - start_time, 5)}s.")
         if plotting:
-            admm_analysis(iter_max, agents, self, times)
+            admm_analysis(iter_max, agents, self, times, "plain_" + str(encrypted) + str(padding))
 
 
 class Agent:
@@ -91,12 +93,13 @@ class Agent:
     def __init__(self, id_, x0, u0=0., q=1):
         self.id = id_
         self.x = [x0]
-        self.u = [u0]
+        self.u = [x0-0.5]
         self.q = q
         Agent.agents.append(self)
 
         # for one time pad
         self.r = None
+        self.bob = None
 
         # for reset
         self.x_decrypted = [x0]
@@ -132,9 +135,18 @@ class Agent:
         self.u.append(u_)
         return u_
 
-    def pick_secret(self, rngenerator):
-        self.r = rngenerator.send_rn(self.id - 1) # TODO:
-        return
+    def pick_secret(self):
+        self.bob = Bob([self.id - 1])
+        self.bob.setup()
+
+    def receive_rn(self):
+        received_secret = self.bob.receive()[0]
+        integers_back = [
+            int.from_bytes(received_secret[i:i + 2], byteorder='little', signed=True)
+            for i in range(0, len(received_secret), 2)
+        ]
+        self.r = integers_back
+
 
 
 iter_max = 18
@@ -147,13 +159,12 @@ mediator = Mediator(0.5)
 
 print("\nQuestion 1")
 mediator.run_admm(Agent.agents, plotting=True)
-
-print("\nQuestion 2")
-mediator.reset(Agent.agents)
-mediator.run_admm(Agent.agents, encrypted=True, plotting=True)
-
-print("\nQuestion 3")
-mediator.reset(Agent.agents)
-mediator.run_admm(Agent.agents, encrypted=True, padding=True, plotting=True)
 print(mediator.x_bar[-1])
-
+#
+# print("\nQuestion 2")
+# mediator.reset(Agent.agents)
+# mediator.run_admm(Agent.agents, encrypted=True, plotting=True)
+#
+# print("\nQuestion 3")
+# mediator.reset(Agent.agents)
+# mediator.run_admm(Agent.agents, encrypted=True, padding=True, plotting=True)
