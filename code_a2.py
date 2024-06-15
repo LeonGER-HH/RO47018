@@ -6,6 +6,28 @@ from phe import paillier
 from helpers import admm_analysis
 import copy
 
+from ot_library.ot import *
+
+
+class RNGenerator:
+    def __init__(self):
+        self.secrets = None
+        self.alice = None
+
+    def generate_randoms(self, n_agents, k_iters):
+        rng = np.random.random((k_iters, n_agents))
+        rng[:, -1] = -1*np.sum(rng[:, :-1], axis=1)
+        # for i in range(n_agents):
+        #     np.random.shuffle(rng[:-1, i])
+        self.secrets = rng
+        self.alice = Alice([self.secrets[:, i] for i in range(n_agents)], n_agents - 1, k_iters)
+        self.alice.setup()
+        return
+
+    def send_rn(self, number):
+        # send a random number vector
+        return self.secrets[:, number]
+
 
 class Mediator:
     def __init__(self, x_bar0):
@@ -14,11 +36,13 @@ class Mediator:
 
         # crypto
         self.pub_k, self.pri_k = paillier.generate_paillier_keypair()
+        self.rngenerator = RNGenerator()
         # for reset
         self._initial_state = copy.deepcopy(self.__dict__)
 
     def reset(self, agents):
         self.__dict__ = copy.deepcopy(self._initial_state)
+        self._initial_state = copy.deepcopy(self.__dict__)
         for agent in agents:
             agent.reset()
 
@@ -32,15 +56,20 @@ class Mediator:
             x_bar_update = self.pub_k.encrypt(x_bar_update)
         self.x_bar.append(x_bar_update)
 
-    def run_admm(self, agents, encrypted=False, plotting=False):
+    def run_admm(self, agents, encrypted=False, padding=False, plotting=False):
         iter_max = 18
         times = []
         start_time = time.perf_counter()
+        if padding:
+            self.rngenerator.generate_randoms(len(agents), iter_max)
+            for agent in agents:
+                agent.pick_secret(self.rngenerator)
+
         for k in range(iter_max):
             iter_start_time = time.perf_counter()
 
             for agent in agents:
-                xi = agent.update_x(self)
+                xi = agent.update_x(self, k, otp=padding)
                 self.receive_xi(agent.id, xi)
 
             self.calc_xbar(encrypted=encrypted)
@@ -66,13 +95,18 @@ class Agent:
         self.q = q
         Agent.agents.append(self)
 
+        # for one time pad
+        self.r = None
+
         # for reset
+        self.x_decrypted = [x0]
         self._initial_state = copy.deepcopy(self.__dict__)
 
     def reset(self):
         self.__dict__ = copy.deepcopy(self._initial_state)
+        self._initial_state = copy.deepcopy(self.__dict__)
 
-    def update_x(self, mediator):
+    def update_x(self, mediator, k, otp=False):
         rho = 1
         # x_ = cp.Variable(1)
         # # debug start
@@ -87,13 +121,20 @@ class Agent:
         x_ = rho * (mediator.x_bar[-1] - self.u[-1]) / (2 * self.q + rho)
         if isinstance(x_, paillier.EncryptedNumber):
             x_ = mediator.pri_k.decrypt(x_)
+        self.x_decrypted.append(x_)
+        if otp:
+            x_ += self.r[k]
         self.x.append(x_)
         return x_
 
     def update_u(self, mediator):
-        u_ = self.u[-1] + self.x[-1] - mediator.x_bar[-1]
+        u_ = self.u[-1] + self.x_decrypted[-1] - mediator.x_bar[-1]
         self.u.append(u_)
         return u_
+
+    def pick_secret(self, rngenerator):
+        self.r = rngenerator.send_rn(self.id - 1) # TODO:
+        return
 
 
 iter_max = 18
@@ -113,5 +154,6 @@ mediator.run_admm(Agent.agents, encrypted=True, plotting=True)
 
 print("\nQuestion 3")
 mediator.reset(Agent.agents)
-
+mediator.run_admm(Agent.agents, encrypted=True, padding=True, plotting=True)
+print(mediator.x_bar[-1])
 
