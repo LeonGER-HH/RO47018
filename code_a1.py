@@ -5,9 +5,10 @@ import os
 
 
 SAVE_FIGS = False
-
+np.random.seed(1)
+params = {}
 """centralized problem"""
-n_agents = 4
+n_agents = 8
 x = cp.Variable(1)
 v = np.array([0.1, 0.5, 0.4, 0.2])
 cost = cp.quad_form(x - v, np.eye(4))
@@ -40,6 +41,8 @@ class Agent:
         self.x = np.empty((n_agents, T))
         self.x[id, 0] = v
         self.v = v
+
+        self.w = 0.  # noise at current iterate if private
         Agent.agents.append(self)
 
     def receive_x(self, k, private=False):
@@ -47,13 +50,15 @@ class Agent:
             if i != self.id:
                 self.x[i, k] = Agent.agents[i].x[i, k]
                 if private:
-                    self.x[i, k] += self.laplace_noise(k)
+                    self.x[i, k] += Agent.agents[i].w
 
-    def update_x(self, k):
+    def update_x(self, k, private=False):
         z = np.dot(A[self.id, :], self.x[:, k])
         grad = 2 * (z - self.v)
         gamma = 0.6**(k + 1) * 1  # step size
         self.x[self.id, k + 1] = self.proj(z - gamma * grad)
+        if private:
+            self.w = self.laplace_noise(k)
 
     @staticmethod
     def proj(p):
@@ -66,15 +71,14 @@ class Agent:
 
     @staticmethod
     def laplace_noise(k):
-        C2 = 1 #0.00025 # 0.0001
-        epsilon = 0.01
+        C2 = 4/n_agents
+        epsilon = params["epsilon"]
         c = 1.
         q = 0.6
         rho = 0.61   # any value in (q, 1)
         b_k = 2 * C2 * np.sqrt(n_agents) * c * rho**(k + 1) / (epsilon * (rho - q))
         w_k = np.random.laplace(0., b_k)  # scaled laplace noise
-        return w_k
-
+        return np.clip(w_k, -(-0.002*k+0.1), (-0.002*k+0.1))
 
 
 v = [0.1, 0.5, 0.4, 0.2, 0.1, 0.5, 0.4, 0.2]
@@ -86,7 +90,7 @@ def run(private=False):
     for k in range(T - 1):
         for agent in Agent.agents:
             agent.receive_x(k, private=private)
-            agent.update_x(k)
+            agent.update_x(k, private=private)
 
     x_final = Agent.agents[0].x[:, -1]
     x_tilde = np.average(x_final)
@@ -102,19 +106,60 @@ def run(private=False):
 # plt.show()
 
 # plot the results
-run(private=True)
+
+print("Question 1")
+run(private=False)
 plt.figure(1)
 for agent in Agent.agents:
     plt.plot(agent.x[agent.id, :], label=("Agent " + str(agent.id + 1)))
-
+plt.plot([0, 50], [0.3, 0.3], "--", label=r"$x^*$")
 plt.legend()
-plt.xlabel("iteration")
-plt.ylabel("x value")
+plt.xlabel("iteration number")
+plt.ylabel("local x value")
+plt.tight_layout()
 if SAVE_FIGS:
     if not os.path.exists("figures4report"):
         os.mkdir("figures4report")
-    plt.savefig('figures4report/distributed_public_consensus_4.png')
+    plt.savefig(f'figures4report/a1_public_{n_agents}.png')
+x_final = np.round(Agent.agents[0].x[0, -1], 2)
+print(f"x final is {x_final}, delta is {x_final - 0.3}")
 plt.show()
 
-""""""
+print("\nQuestion 2")
+params["epsilon"] = 0.001
+run(private=True)
+plt.figure(2)
+for agent in Agent.agents:
+    plt.plot(agent.x[agent.id, :], label=("Agent " + str(agent.id + 1)))
+plt.plot([0, 50], [0.3, 0.3], "--", label=r"$x^*$")
+plt.legend()
+plt.xlabel("iteration number")
+plt.ylabel("local x value")
+plt.tight_layout()
+x_final = np.round(Agent.agents[0].x[0, -1], 2)
+print(f"x final is {x_final}, delta is {x_final - 0.3}")
+if SAVE_FIGS:
+    plt.savefig(f'figures4report/a1_private_{n_agents}_eps_{params["epsilon"]}.png')
+else:
+    plt.title("Private, epsilon=0.001")
+plt.show()
+
+print("\nQuestion 2b")
+params["epsilon"] = 0.01
+run(private=True)
+plt.figure(2)
+for agent in Agent.agents:
+    plt.plot(agent.x[agent.id, :], label=("Agent " + str(agent.id + 1)))
+plt.plot([0, 50], [0.3, 0.3], "--", label=r"$x^*$")
+plt.legend()
+plt.xlabel("iteration number")
+plt.ylabel("local x value")
+plt.tight_layout()
+x_final = np.round(Agent.agents[0].x[0, -1], 2)
+print(f"x final is {x_final}, delta is {x_final - 0.3}")
+if SAVE_FIGS:
+    plt.savefig(f'figures4report/a1_private_{n_agents}_eps_{params["epsilon"]}.png')
+else:
+    plt.title("Private, epsilon=0.01")
+plt.show()
 

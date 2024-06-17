@@ -160,11 +160,11 @@ mediator = Mediator(0.5)
 print("\nQuestion 1")
 mediator.run_admm(Agent.agents, plotting=True)
 print(mediator.x_bar[-1])
-#
-# print("\nQuestion 2")
-# mediator.reset(Agent.agents)
-# mediator.run_admm(Agent.agents, encrypted=True, plotting=True)
-#
-# print("\nQuestion 3")
-# mediator.reset(Agent.agents)
-# mediator.run_admm(Agent.agents, encrypted=True, padding=True, plotting=True)
+
+print("\nQuestion 2")
+mediator.reset(Agent.agents)
+mediator.run_admm(Agent.agents, encrypted=True, plotting=True)
+
+print("\nQuestion 3")
+mediator.reset(Agent.agents)
+mediator.run_admm(Agent.agents, encrypted=True, padding=True, plotting=True)
