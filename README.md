@@ -1,7 +1,7 @@
 ## Dependencies
 Please install some python packages
 ```
-pip install cvxpy matplotlib control numpy rsa
+pip install cvxpy matplotlib control numpy rsa phe
 ```
 
 ## Run
