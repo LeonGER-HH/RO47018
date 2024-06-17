@@ -1,12 +1,11 @@
 import numpy as np
-import matplotlib.pyplot as plt
-import cvxpy as cp
 import time
 from phe import paillier
 from helpers import admm_analysis
 import copy
-
-from ot_library.ot import *
+import sys
+sys.path.append('./ot_library/')
+from ot import *
 
 
 class RNGenerator:
